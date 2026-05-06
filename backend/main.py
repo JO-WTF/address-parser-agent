@@ -1,13 +1,13 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 import pandas as pd
 import uuid
-import os
 import json
 import re
+import asyncio
 from pathlib import Path
 
 BASE = Path(__file__).resolve().parent
@@ -26,6 +26,28 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+class WSManager:
+    def __init__(self):
+        self.connections: Dict[str, List[WebSocket]] = {}
+
+    async def connect(self, job_id: str, websocket: WebSocket):
+        await websocket.accept()
+        self.connections.setdefault(job_id, []).append(websocket)
+
+    def disconnect(self, job_id: str, websocket: WebSocket):
+        if job_id in self.connections and websocket in self.connections[job_id]:
+            self.connections[job_id].remove(websocket)
+            if not self.connections[job_id]:
+                del self.connections[job_id]
+
+    async def broadcast(self, job_id: str, payload: Dict[str, Any]):
+        for ws in self.connections.get(job_id, []):
+            await ws.send_json(payload)
+
+
+ws_manager = WSManager()
 
 
 def guess_address_columns(columns: List[str]) -> List[str]:
@@ -72,6 +94,27 @@ class ConfirmRequest(BaseModel):
     output_columns_prefix: str = "parsed"
 
 
+def load_job(job_id: str) -> Dict[str, Any]:
+    p = JOBS_DIR / f"{job_id}.json"
+    if not p.exists():
+        raise HTTPException(status_code=404, detail="Job not found")
+    return json.loads(p.read_text(encoding="utf-8"))
+
+
+def save_job(job: Dict[str, Any]):
+    (JOBS_DIR / f"{job['job_id']}.json").write_text(json.dumps(job, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+@app.websocket("/ws/job/{job_id}")
+async def ws_job_progress(websocket: WebSocket, job_id: str):
+    await ws_manager.connect(job_id, websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        ws_manager.disconnect(job_id, websocket)
+
+
 @app.post("/api/upload")
 async def upload_excel(file: UploadFile = File(...)):
     if not file.filename.endswith((".xlsx", ".xls")):
@@ -98,19 +141,8 @@ async def upload_excel(file: UploadFile = File(...)):
         "processed_rows": 0,
         "total_rows": len(df),
     }
-    (JOBS_DIR / f"{job_id}.json").write_text(json.dumps(job_state, ensure_ascii=False, indent=2), encoding="utf-8")
+    save_job(job_state)
     return job_state
-
-
-def load_job(job_id: str) -> Dict[str, Any]:
-    p = JOBS_DIR / f"{job_id}.json"
-    if not p.exists():
-        raise HTTPException(status_code=404, detail="Job not found")
-    return json.loads(p.read_text(encoding="utf-8"))
-
-
-def save_job(job: Dict[str, Any]):
-    (JOBS_DIR / f"{job['job_id']}.json").write_text(json.dumps(job, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 @app.get("/api/job/{job_id}")
@@ -119,7 +151,7 @@ def get_job(job_id: str):
 
 
 @app.post("/api/confirm")
-def confirm_and_process(req: ConfirmRequest):
+async def confirm_and_process(req: ConfirmRequest):
     job = load_job(req.job_id)
     df = pd.read_excel(job["input_path"])
     if req.target_column not in df.columns:
@@ -128,6 +160,7 @@ def confirm_and_process(req: ConfirmRequest):
     job["status"] = "processing"
     job["target_column"] = req.target_column
     save_job(job)
+    await ws_manager.broadcast(req.job_id, job)
 
     start = int(job.get("processed_rows", 0))
     total = len(df)
@@ -141,6 +174,9 @@ def confirm_and_process(req: ConfirmRequest):
         job["processed_rows"] = idx + 1
         job["progress"] = int((idx + 1) * 100 / max(total, 1))
         save_job(job)
+        if idx % 10 == 0 or idx == total - 1:
+            await ws_manager.broadcast(req.job_id, job)
+            await asyncio.sleep(0)
 
     output_path = OUTPUTS_DIR / f"{req.job_id}_parsed.xlsx"
     df.to_excel(output_path, index=False)
@@ -148,7 +184,7 @@ def confirm_and_process(req: ConfirmRequest):
     job["status"] = "completed"
     job["progress"] = 100
     save_job(job)
-
+    await ws_manager.broadcast(req.job_id, job)
     return job
 
 
