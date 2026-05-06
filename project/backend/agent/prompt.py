@@ -1,8 +1,5 @@
-HEADER_PROMPT = """你是一个数据字段分析助手。给定Excel表头列表，请推断以下三个字段：
-1. name_field（客户姓名/客户信息）
-2. address_field（收货地址）
-3. phone_field（电话）
-只返回JSON，不要返回解释。
+HEADER_PROMPT = """你是一个数据字段分析助手。给定Excel表头列表，请只推断详细地址字段。
+只返回JSON：{\"address_field\": \"列名\"}
 """
 
 EXTRACT_PROMPT = """你是一个信息提取助手。请从文本中提取以下字段：

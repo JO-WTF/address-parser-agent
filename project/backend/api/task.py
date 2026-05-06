@@ -10,7 +10,6 @@ from pydantic import BaseModel
 from agent.core import Agent
 from task.manager import TaskManager
 from tools.excel import ExcelTool
-from tools.extractor import merge_text
 
 router = APIRouter()
 manager = TaskManager()
@@ -26,10 +25,7 @@ async def publish(task_id: str, payload: dict):
 
 class RunRequest(BaseModel):
     task_id: str
-    selected_column: str
-    name_field: str
     address_field: str
-    phone_field: str
 
 
 @router.get("/headers/{task_id}")
@@ -47,10 +43,8 @@ async def run(req: RunRequest):
         raise HTTPException(404, "task not found")
     manager.update_task(
         req.task_id,
-        selected_column=req.selected_column,
-        name_field=req.name_field,
+        selected_column=req.address_field,
         address_field=req.address_field,
-        phone_field=req.phone_field,
         status="running",
     )
     asyncio.create_task(process_task(req.task_id))
@@ -70,11 +64,7 @@ async def process_task(task_id: str):
             latest = manager.get_task(task_id)
             if i < latest.current_row:
                 continue
-            text = merge_text(
-                str(getattr(row, latest.name_field, "")),
-                str(getattr(row, latest.address_field, "")),
-                str(getattr(row, latest.phone_field, "")),
-            )
+            text = str(getattr(row, latest.address_field, ""))
             result = agent.extract_info(text)
             excel.write_result_row(latest.output_path, i + 1, result)
             progress = i / total if total else 1.0

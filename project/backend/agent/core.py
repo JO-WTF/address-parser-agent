@@ -45,11 +45,7 @@ class Agent:
             ],
         )
         data = self._parse_json(resp.choices[0].message.content or "{}")
-        return {
-            "name_field": str(data.get("name_field", "")),
-            "address_field": str(data.get("address_field", "")),
-            "phone_field": str(data.get("phone_field", "")),
-        }
+        return {"address_field": str(data.get("address_field", ""))}
 
     def extract_info(self, text: str) -> dict[str, str]:
         resp = self.client.chat.completions.create(
