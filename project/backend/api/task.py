@@ -17,10 +17,16 @@ manager = TaskManager()
 excel = ExcelTool()
 agent = Agent()
 subscribers: Dict[str, set[asyncio.Queue]] = {}
+event_buffers: Dict[str, list[dict]] = {}
 logger = get_logger("api.task")
 
 
 async def publish(task_id: str, payload: dict):
+    buffer = event_buffers.setdefault(task_id, [])
+    buffer.append(payload)
+    if len(buffer) > 200:
+        del buffer[:-200]
+
     channels = subscribers.get(task_id, set())
     logger.info("[WS] publish task=%s, subscribers=%s, payload=%s", task_id, len(channels), payload)
     for q in channels:

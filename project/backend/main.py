@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.upload import router as upload_router
 from api.agent import router as agent_router
-from api.task import router as task_router, subscribers
+from api.task import router as task_router, subscribers, event_buffers
 from storage.db import init_db
 from logger import get_logger, setup_logging
 
@@ -37,6 +37,10 @@ async def ws_task(websocket: WebSocket, task_id: str):
     q: asyncio.Queue = asyncio.Queue()
     subscribers.setdefault(task_id, set()).add(q)
     logger.info("[WS] connected task=%s, subscribers=%s", task_id, len(subscribers.get(task_id, set())))
+    # send buffered events first in case client connected after task already started
+    for event in event_buffers.get(task_id, []):
+        await websocket.send_json(event)
+
     try:
         while True:
             data = await q.get()
