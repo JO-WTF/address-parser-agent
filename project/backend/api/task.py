@@ -19,7 +19,9 @@ subscribers: Dict[str, set[asyncio.Queue]] = {}
 
 
 async def publish(task_id: str, payload: dict):
-    for q in subscribers.get(task_id, set()):
+    channels = subscribers.get(task_id, set())
+    print(f"[WS] publish task={task_id}, subscribers={len(channels)}, payload={payload}")
+    for q in channels:
         await q.put(payload)
 
 
@@ -56,6 +58,7 @@ async def process_task(task_id: str):
     if not task:
         return
     try:
+        print(f"[TASK] start processing task_id={task_id}")
         excel.copy_to_output(task.file_path, task.output_path)
         df = pd.read_excel(task.file_path).fillna("")
         total = len(df)
@@ -65,14 +68,17 @@ async def process_task(task_id: str):
             if i < latest.current_row:
                 continue
             text = str(getattr(row, latest.address_field, ""))
+            print(f"[TASK] row={i}, text={text}")
             result = agent.extract_info(text)
             excel.write_result_row(latest.output_path, i + 1, result)
             progress = i / total if total else 1.0
             manager.update_task(task_id, current_row=i, progress=progress)
             await publish(task_id, {"progress": progress, "current": i, "total": total})
+        print(f"[TASK] completed task_id={task_id}")
         manager.update_task(task_id, status="completed", progress=1.0)
         await publish(task_id, {"progress": 1.0, "status": "completed"})
     except Exception as e:
+        print(f"[TASK] failed task_id={task_id}, error={e}")
         manager.update_task(task_id, status="failed", error=str(e))
         await publish(task_id, {"status": "failed", "error": str(e)})
 

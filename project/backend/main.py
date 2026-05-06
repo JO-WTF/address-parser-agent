@@ -32,9 +32,11 @@ async def ws_task(websocket: WebSocket, task_id: str):
     await websocket.accept()
     q: asyncio.Queue = asyncio.Queue()
     subscribers.setdefault(task_id, set()).add(q)
+    print(f"[WS] connected task={task_id}, subscribers={len(subscribers.get(task_id, set()))}")
     try:
         while True:
             data = await q.get()
             await websocket.send_json(data)
     except WebSocketDisconnect:
         subscribers.get(task_id, set()).discard(q)
+        print(f"[WS] disconnected task={task_id}, subscribers={len(subscribers.get(task_id, set()))}")
