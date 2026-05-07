@@ -55,6 +55,12 @@
           <el-button type="primary" @click="download" :disabled="status !== 'completed'">下载结果</el-button>
         </section>
       </el-card>
+      <el-card class="log-card" shadow="never">
+        <template #header><strong>运行日志</strong></template>
+        <div class="log-wrap">
+          <div v-for="(line, idx) in logs" :key="idx" class="log-line">{{ line }}</div>
+        </div>
+      </el-card>
     </div>
   </div>
 </template>
@@ -73,14 +79,24 @@ const current = ref(0)
 const total = ref(0)
 const fields = ref({ address_field: '' })
 const loadingAnalyze = ref(false)
+const logs = ref([])
 let ws = null
 let pollTimer = null
+
+
+const addLog = (msg, extra = null) => {
+  const ts = new Date().toLocaleTimeString()
+  logs.value.push(`[${ts}] ${msg}`)
+  if (extra) logs.value.push(`  -> ${JSON.stringify(extra)}`)
+  if (logs.value.length > 500) logs.value.splice(0, logs.value.length - 500)
+}
 
 const statusTagType = (s) => ({ completed: 'success', failed: 'danger', running: 'warning', uploaded: 'info' }[s] || 'info')
 
 const fetchTasks = async () => {
   const r = await api.get('/tasks')
   tasks.value = r.data.tasks || []
+  addLog('刷新任务列表', { count: tasks.value.length })
 }
 
 const selectTask = async (t) => {
@@ -91,6 +107,7 @@ const selectTask = async (t) => {
   total.value = Number(t.total_rows || 0)
   fields.value.address_field = t.selected_column || fields.value.address_field
   await syncTaskStatus()
+  addLog('切换任务', { task_id: t.id, status: status.value })
   if (status.value === 'running') {
     const wsReady = await connectWebSocket()
     if (!wsReady) startPolling()
@@ -105,6 +122,7 @@ const onFileChange = async (f) => {
   taskId.value = r.data.task_id
   await fetchTasks()
   ElMessage.success('上传成功')
+  addLog('上传成功', r.data)
 }
 
 const fetchHeadersAndAnalyze = async () => {
@@ -114,6 +132,7 @@ const fetchHeadersAndAnalyze = async () => {
     headers.value = hr.data.headers || []
     const ar = await api.post('/analyze', { headers: headers.value })
     fields.value.address_field = ar.data.address_field || ''
+    addLog('地址字段猜测完成', ar.data)
   } finally { loadingAnalyze.value = false }
 }
 
@@ -146,6 +165,7 @@ const connectWebSocket = async () => {
     if (d.current != null) current.value = d.current
     if (d.total != null) total.value = d.total
     if (d.status) status.value = d.status
+    if (d.text != null || d.result != null) addLog('收到WS进度', { current: d.current, total: d.total, status: d.status })
   }
 
   return await new Promise((resolve) => {
@@ -165,6 +185,7 @@ const stopTask = async () => {
   status.value = 'stopped'
   await syncTaskStatus()
   await fetchTasks()
+  addLog('任务已停止', { task_id: taskId.value })
 }
 
 const deleteCurrentTask = async () => {
@@ -178,13 +199,16 @@ const deleteCurrentTask = async () => {
   headers.value = []
   fields.value.address_field = ''
   await fetchTasks()
+  addLog('任务已删除')
 }
+
 
 const run = async () => {
   const wsReady = await connectWebSocket()
   await api.post('/run', { task_id: taskId.value, address_field: fields.value.address_field })
   status.value = 'running'
   await fetchTasks()
+  addLog('任务启动/续跑', { task_id: taskId.value, ws: wsReady ? 'connected' : 'fallback_polling' })
   if (!wsReady) startPolling()
 }
 
@@ -205,4 +229,7 @@ onMounted(fetchTasks)
 .section { margin-bottom: 18px; padding-bottom: 8px; border-bottom: 1px dashed #e5e7eb; }
 .section h3 { margin: 0 0 10px; color: #374151; }
 .hint,.status { margin-top: 8px; color: #374151; }
+.log-card { margin-top: 16px; border-radius: 12px; }
+.log-wrap { max-height: 260px; overflow: auto; background: #0b1220; color: #d1fae5; padding: 10px; border-radius: 8px; font-family: monospace; }
+.log-line { margin-bottom: 6px; white-space: pre-wrap; }
 </style>
