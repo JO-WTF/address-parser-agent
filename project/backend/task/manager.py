@@ -67,6 +67,16 @@ class TaskManager:
         finally:
             conn.close()
 
+    def delete_task(self, task_id: str) -> bool:
+        with self._lock:
+            conn = get_conn()
+            try:
+                cursor = conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+                conn.commit()
+                return cursor.rowcount > 0
+            finally:
+                conn.close()
+
     def get_task(self, task_id: str) -> Optional[Task]:
         conn = get_conn()
         try:

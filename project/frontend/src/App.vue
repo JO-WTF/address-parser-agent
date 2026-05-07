@@ -45,7 +45,7 @@
         <section class="section">
           <h3>3) 确认字段并启动/续跑任务</h3>
           <el-form label-width="140px"><el-form-item label="address_field"><el-input v-model="fields.address_field" placeholder="请确认详细地址字段"/></el-form-item></el-form>
-          <el-button type="warning" @click="run" :disabled="!fields.address_field || !taskId">启动/续跑</el-button>
+          <el-space><el-button type="warning" @click="run" :disabled="!fields.address_field || !taskId">启动/续跑</el-button><el-button type="danger" plain @click="stopTask" :disabled="!taskId || status !== 'running'">停止任务</el-button><el-button type="danger" @click="deleteCurrentTask" :disabled="!taskId">删除任务</el-button></el-space>
         </section>
 
         <section class="section">
@@ -142,6 +142,28 @@ const connectWebSocket = async () => {
     if (d.status) status.value = d.status
   }
   ws.onclose = () => { if (!['completed', 'failed'].includes(status.value)) startPolling() }
+}
+
+
+const stopTask = async () => {
+  if (!taskId.value) return
+  await api.post(`/task/${taskId.value}/stop`)
+  status.value = 'stopped'
+  await syncTaskStatus()
+  await fetchTasks()
+}
+
+const deleteCurrentTask = async () => {
+  if (!taskId.value) return
+  await api.delete(`/task/${taskId.value}`)
+  taskId.value = ''
+  status.value = 'idle'
+  progress.value = 0
+  current.value = 0
+  total.value = 0
+  headers.value = []
+  fields.value.address_field = ''
+  await fetchTasks()
 }
 
 const run = async () => {

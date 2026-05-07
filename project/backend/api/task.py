@@ -1,6 +1,7 @@
 import asyncio
 from pathlib import Path
 from typing import Dict
+import contextlib
 
 import pandas as pd
 from fastapi import APIRouter, HTTPException
@@ -18,6 +19,7 @@ excel = ExcelTool()
 agent = Agent()
 subscribers: Dict[str, set] = {}
 event_buffers: Dict[str, list[dict]] = {}
+running_jobs: Dict[str, asyncio.Task] = {}
 logger = get_logger("api.task")
 
 
@@ -65,7 +67,9 @@ async def run(req: RunRequest):
         total_rows=total,
     )
     await publish(req.task_id, {"progress": 0, "current": 0, "total": total})
-    asyncio.create_task(process_task(req.task_id))
+    if req.task_id in running_jobs and not running_jobs[req.task_id].done():
+        raise HTTPException(400, "task is already running")
+    running_jobs[req.task_id] = asyncio.create_task(process_task(req.task_id))
     return {"ok": True, "total": total}
 
 
@@ -116,15 +120,60 @@ async def process_task(task_id: str):
         logger.info("[TASK] completed task_id=%s", task_id)
         manager.update_task(task_id, status="completed", progress=1.0)
         await publish(task_id, {"progress": 1.0, "status": "completed"})
+    except asyncio.CancelledError:
+        logger.info("[TASK] stopped task_id=%s", task_id)
+        manager.update_task(task_id, status="stopped")
+        await publish(task_id, {"status": "stopped"})
+        raise
     except Exception as e:
         logger.exception("[TASK] failed task_id=%s, error=%s", task_id, e)
         manager.update_task(task_id, status="failed", error=str(e))
         await publish(task_id, {"status": "failed", "error": str(e)})
+    finally:
+        running_jobs.pop(task_id, None)
 
 
 @router.get("/tasks")
 def list_tasks():
     return {"tasks": [task.to_dict() for task in manager.list_tasks()]}
+
+
+@router.post("/task/{task_id}/stop")
+async def stop_task(task_id: str):
+    task = manager.get_task(task_id)
+    if not task:
+        raise HTTPException(404, "task not found")
+    job = running_jobs.get(task_id)
+    if job and not job.done():
+        job.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await job
+    manager.update_task(task_id, status="stopped")
+    await publish(task_id, {"status": "stopped"})
+    return {"ok": True}
+
+
+@router.delete("/task/{task_id}")
+async def delete_task(task_id: str):
+    task = manager.get_task(task_id)
+    if not task:
+        raise HTTPException(404, "task not found")
+
+    job = running_jobs.get(task_id)
+    if job and not job.done():
+        job.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await job
+
+    for p in [Path(task.file_path), Path(task.output_path)]:
+        if p.exists():
+            p.unlink()
+
+    deleted = manager.delete_task(task_id)
+    subscribers.pop(task_id, None)
+    event_buffers.pop(task_id, None)
+    running_jobs.pop(task_id, None)
+    return {"ok": deleted}
 
 
 @router.get("/task/{task_id}")
