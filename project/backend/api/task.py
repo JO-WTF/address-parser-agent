@@ -57,7 +57,7 @@ async def run(req: RunRequest):
     task = manager.get_task(req.task_id)
     if not task:
         raise HTTPException(404, "task not found")
-    total = await asyncio.to_thread(excel.get_total_rows, task.file_path)
+    total = await asyncio.to_thread(lambda: len(pd.read_excel(task.file_path).fillna("")))
     manager.update_task(
         req.task_id,
         selected_column=req.address_field,
