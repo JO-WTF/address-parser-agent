@@ -66,11 +66,19 @@ async def run(req: RunRequest):
         status="running",
         total_rows=total,
     )
-    await publish(req.task_id, {"progress": 0, "current": 0, "total": total})
+    await publish(
+        req.task_id,
+        {
+            "progress": float(task.progress or 0),
+            "current": int(task.current_row or 0),
+            "total": total,
+            "status": "running",
+        },
+    )
     if req.task_id in running_jobs and not running_jobs[req.task_id].done():
         raise HTTPException(400, "task is already running")
     running_jobs[req.task_id] = asyncio.create_task(process_task(req.task_id))
-    return {"ok": True, "total": total}
+    return {"ok": True, "total": total, "current": int(task.current_row or 0), "progress": float(task.progress or 0)}
 
 
 async def process_task(task_id: str):
