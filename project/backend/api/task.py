@@ -89,7 +89,20 @@ async def process_task(task_id: str):
             result = await asyncio.to_thread(agent.extract_info, text)
             await asyncio.to_thread(excel.write_result_row, latest.output_path, i + 1, result)
             progress = i / total if total else 1.0
-            manager.update_task(task_id, current_row=i, progress=progress)
+            manager.update_task(
+                task_id,
+                current_row=i,
+                progress=progress,
+                contact_name=result.get("name", ""),
+                contact_phone=result.get("phone", ""),
+                contact_email=result.get("email", ""),
+                company_name=result.get("company_name", ""),
+                address_detail=result.get("address", ""),
+                province=result.get("province", ""),
+                city=result.get("city", ""),
+                country=result.get("country", ""),
+                delivery_note=result.get("remark", ""),
+            )
             await publish(
                 task_id,
                 {

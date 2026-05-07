@@ -66,5 +66,14 @@ class Agent:
         raw = resp.choices[0].message.content or "{}"
         self.logger.info("[LLM] extract_info response: %s", raw)
         data = self._parse_json(raw)
-        keys = ["name", "phone", "address", "province", "city"]
-        return {k: str(data.get(k, "")) for k in keys}
+        return {
+            "name": str(data.get("name", "")),
+            "phone": str(data.get("phone", "")),
+            "email": str(data.get("email", "")),
+            "company_name": str(data.get("company_name") or data.get("company name", "")),
+            "address": str(data.get("address") or data.get("full_address") or data.get("full address", "")),
+            "province": str(data.get("province", "")),
+            "city": str(data.get("city", "")),
+            "country": str(data.get("country", "")),
+            "remark": str(data.get("remark", "")),
+        }

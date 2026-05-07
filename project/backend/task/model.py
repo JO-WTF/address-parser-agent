@@ -15,6 +15,15 @@ class Task:
     name_field: Optional[str] = None
     address_field: Optional[str] = None
     phone_field: Optional[str] = None
+    contact_name: Optional[str] = None
+    contact_phone: Optional[str] = None
+    contact_email: Optional[str] = None
+    company_name: Optional[str] = None
+    address_detail: Optional[str] = None
+    province: Optional[str] = None
+    city: Optional[str] = None
+    country: Optional[str] = None
+    delivery_note: Optional[str] = None
     error: Optional[str] = None
     created_at: str = ""
     updated_at: str = ""
