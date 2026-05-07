@@ -57,14 +57,17 @@ async def run(req: RunRequest):
     task = manager.get_task(req.task_id)
     if not task:
         raise HTTPException(404, "task not found")
+    total = await asyncio.to_thread(lambda: len(pd.read_excel(task.file_path).fillna("")))
     manager.update_task(
         req.task_id,
         selected_column=req.address_field,
         address_field=req.address_field,
         status="running",
+        total_rows=total,
     )
+    await publish(req.task_id, {"progress": 0, "current": 0, "total": total})
     asyncio.create_task(process_task(req.task_id))
-    return {"ok": True}
+    return {"ok": True, "total": total}
 
 
 async def process_task(task_id: str):
@@ -87,7 +90,16 @@ async def process_task(task_id: str):
             await asyncio.to_thread(excel.write_result_row, latest.output_path, i + 1, result)
             progress = i / total if total else 1.0
             manager.update_task(task_id, current_row=i, progress=progress)
-            await publish(task_id, {"progress": progress, "current": i, "total": total})
+            await publish(
+                task_id,
+                {
+                    "progress": progress,
+                    "current": i,
+                    "total": total,
+                    "text": text,
+                    "result": result,
+                },
+            )
             await asyncio.sleep(0)
         logger.info("[TASK] completed task_id=%s", task_id)
         manager.update_task(task_id, status="completed", progress=1.0)
