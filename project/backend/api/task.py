@@ -61,7 +61,6 @@ async def run(req: RunRequest):
     manager.update_task(
         req.task_id,
         selected_column=req.address_field,
-        address_field=req.address_field,
         status="running",
         total_rows=total,
     )
@@ -84,7 +83,7 @@ async def process_task(task_id: str):
             latest = manager.get_task(task_id)
             if i < latest.current_row:
                 continue
-            text = str(getattr(row, latest.address_field, ""))
+            text = str(getattr(row, latest.selected_column, ""))
             logger.info("[TASK] row=%s, text=%s", i, text)
             result = await asyncio.to_thread(agent.extract_info, text)
             await asyncio.to_thread(excel.write_result_row, latest.output_path, i + 1, result)

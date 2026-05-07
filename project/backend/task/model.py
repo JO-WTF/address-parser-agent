@@ -12,9 +12,6 @@ class Task:
     file_path: str
     output_path: str
     selected_column: Optional[str] = None
-    name_field: Optional[str] = None
-    address_field: Optional[str] = None
-    phone_field: Optional[str] = None
     contact_name: Optional[str] = None
     contact_phone: Optional[str] = None
     contact_email: Optional[str] = None

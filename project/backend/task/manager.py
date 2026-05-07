@@ -27,11 +27,10 @@ class TaskManager:
                     INSERT INTO tasks (
                         id, status, progress, current_row, total_rows,
                         file_path, output_path, selected_column,
-                        name_field, address_field, phone_field,
                         contact_name, contact_phone, contact_email, company_name,
                         address_detail, province, city, country, delivery_note,
                         error, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         task.id,
@@ -42,9 +41,6 @@ class TaskManager:
                         task.file_path,
                         task.output_path,
                         task.selected_column,
-                        task.name_field,
-                        task.address_field,
-                        task.phone_field,
                         task.contact_name,
                         task.contact_phone,
                         task.contact_email,
