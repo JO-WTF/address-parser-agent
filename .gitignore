@@ -1,2 +1,7 @@
 __pycache__/
 *.pyc
+project/backend/outputs/
+project/backend/uploads/
+**/pnpm-lock.yaml
+**/npm-lock.yaml
+**/tasks.db
