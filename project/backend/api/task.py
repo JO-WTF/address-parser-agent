@@ -57,15 +57,17 @@ async def run(req: RunRequest):
     task = manager.get_task(req.task_id)
     if not task:
         raise HTTPException(404, "task not found")
+    total = await asyncio.to_thread(excel.get_total_rows, task.file_path)
     manager.update_task(
         req.task_id,
         selected_column=req.address_field,
         address_field=req.address_field,
         status="running",
+        total_rows=total,
     )
-    await publish(req.task_id, {"progress": 0, "current": 0, "total": 3})
+    await publish(req.task_id, {"progress": 0, "current": 0, "total": total})
     asyncio.create_task(process_task(req.task_id))
-    return {"ok": True}
+    return {"ok": True, "total": total}
 
 
 async def process_task(task_id: str):

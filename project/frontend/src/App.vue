@@ -198,9 +198,14 @@ const run = async () => {
   const req = { task_id: taskId.value, address_field: fields.value.address_field }
   try {
     await connectWebSocket()
-    await api.post('/run', req)
+    const runResp = await api.post('/run', req)
+    if (runResp?.data?.total != null) {
+      total.value = Number(runResp.data.total)
+      current.value = 0
+      progress.value = 0
+    }
     status.value = 'running'
-    addLog('任务启动成功', req)
+    addLog('任务启动成功', { ...req, total: runResp?.data?.total })
     await syncTaskStatus()
   } catch (e) {
     startPolling()
