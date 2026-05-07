@@ -31,15 +31,16 @@
 
         <section class="section">
           <h3>1) 上传 Excel（上传后自动获取表头并猜测）</h3>
-          <el-upload :show-file-list="true" :auto-upload="false" :limit="1" :on-change="onFileChange" :on-exceed="onExceed" accept=".xlsx,.xls">
-            <el-button type="primary" :loading="loadingAnalyze">选择并上传 Excel</el-button>
+          <el-upload :show-file-list="true" :auto-upload="false" :limit="1" :on-change="onFileChange" :on-exceed="onExceed" accept=".xlsx,.xls" :disabled="historyLocked">
+            <el-button type="primary" :loading="loadingAnalyze" :disabled="historyLocked">选择并上传 Excel</el-button>
           </el-upload>
           <div class="hint">当前文件：{{ uploadedFileName || '暂无' }}</div>
+          <div v-if="historyLocked" class="hint">历史任务已锁定：不可更换文件或修改待解析字段</div>
         </section>
 
         <section class="section">
           <h3>2) 确认字段并启动/续跑任务</h3>
-          <el-form label-width="140px"><el-form-item label="address_field"><el-input v-model="fields.address_field" placeholder="请确认详细地址字段"/></el-form-item></el-form>
+          <el-form label-width="140px"><el-form-item label="待解析字段"><el-input v-model="fields.address_field" placeholder="请确认待解析字段" :disabled="historyLocked"/></el-form-item></el-form>
           <el-space><el-button type="warning" @click="run" :disabled="!fields.address_field || !taskId">启动/续跑</el-button><el-button type="danger" plain @click="stopTask" :disabled="!taskId || status !== 'running'">停止任务</el-button><el-button type="danger" @click="deleteCurrentTask" :disabled="!taskId">删除任务</el-button></el-space>
         </section>
 
@@ -75,6 +76,7 @@ const total = ref(0)
 const fields = ref({ address_field: '' })
 const loadingAnalyze = ref(false)
 const uploadedFileName = ref('')
+const historyLocked = ref(false)
 const logs = ref([])
 const autoScroll = ref(true)
 const logWrapRef = ref(null)
@@ -126,6 +128,7 @@ const selectTask = async (t) => {
   total.value = Number(t.total_rows || 0)
   fields.value.address_field = t.selected_column || fields.value.address_field
   uploadedFileName.value = getDisplayFileName(t.file_path || '')
+  historyLocked.value = Boolean(t.file_path)
   await syncTaskStatus()
   addLog('切换任务', `task_id=${t.id} | status=${status.value}`)
   if (status.value === 'running') {
@@ -141,6 +144,7 @@ const onFileChange = async (f) => {
   const r = await api.post('/upload', fd)
   taskId.value = r.data.task_id
   uploadedFileName.value = file.value?.name || ''
+  historyLocked.value = false
   await fetchTasks()
   ElMessage.success('上传成功，开始自动猜测字段')
   addLog('上传成功', `task_id=${r.data.task_id}`)
@@ -225,6 +229,7 @@ const deleteCurrentTask = async () => {
   headers.value = []
   fields.value.address_field = ''
   uploadedFileName.value = ''
+  historyLocked.value = false
   await fetchTasks()
   addLog('任务已删除')
 }
