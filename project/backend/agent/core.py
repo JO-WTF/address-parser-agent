@@ -75,5 +75,6 @@ class Agent:
             "province": str(data.get("province", "")),
             "city": str(data.get("city", "")),
             "country": str(data.get("country", "")),
+            "postcode": str(data.get("postcode", "")),
             "remark": str(data.get("remark", "")),
         }

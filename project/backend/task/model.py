@@ -20,6 +20,7 @@ class Task:
     province: Optional[str] = None
     city: Optional[str] = None
     country: Optional[str] = None
+    postcode: Optional[str] = None
     delivery_note: Optional[str] = None
     error: Optional[str] = None
     created_at: str = ""

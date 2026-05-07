@@ -94,6 +94,7 @@ const formatResultFields = (result = {}) => {
     `省份: ${result.province || ''}`,
     `城市: ${result.city || ''}`,
     `国家: ${result.country || ''}`,
+    `邮编: ${result.postcode || ''}`,
     `配送备注: ${result.remark || ''}`,
   ]
   return rows.join(' | ')

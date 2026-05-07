@@ -112,6 +112,7 @@ async def process_task(task_id: str):
                 province=result.get("province", ""),
                 city=result.get("city", ""),
                 country=result.get("country", ""),
+                postcode=result.get("postcode", ""),
                 delivery_note=result.get("remark", ""),
             )
             await publish(

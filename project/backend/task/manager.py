@@ -28,9 +28,9 @@ class TaskManager:
                         id, status, progress, current_row, total_rows,
                         file_path, output_path, selected_column,
                         contact_name, contact_phone, contact_email, company_name,
-                        address_detail, province, city, country, delivery_note,
+                        address_detail, province, city, country, postcode, delivery_note,
                         error, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         task.id,
@@ -49,6 +49,7 @@ class TaskManager:
                         task.province,
                         task.city,
                         task.country,
+                        task.postcode,
                         task.delivery_note,
                         task.error,
                         task.created_at or self._now(),

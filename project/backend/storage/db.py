@@ -34,6 +34,7 @@ def init_db() -> None:
                 province TEXT,
                 city TEXT,
                 country TEXT,
+                postcode TEXT,
                 delivery_note TEXT,
                 error TEXT,
                 created_at TEXT NOT NULL,
